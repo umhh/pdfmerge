@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Duplex-Mischer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --card: #ffffff;
+    --ink: #1d1d1b;
+    --muted: #6b6a66;
+    --line: #d9d7d0;
+    --accent: #2f5d50;
+    --accent-ink: #ffffff;
+    --ok: #2f5d50;
+    --warn: #9a5b00;
+    --err: #a3261b;
+    --drop: #e8efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615;
+      --card: #20201e;
+      --ink: #ecebe6;
+      --muted: #9b9a94;
+      --line: #383733;
+      --accent: #7fb8a4;
+      --accent-ink: #10201b;
+      --ok: #7fb8a4;
+      --warn: #e0a64a;
+      --err: #ef7a6e;
+      --drop: #24302b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .lead { color: var(--muted); margin: 0 0 28px; }
+  .zones { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .zones { grid-template-columns: 1fr; } }
+  .zone {
+    position: relative;
+    background: var(--card);
+    border: 2px dashed var(--line);
+    border-radius: 14px;
+    padding: 22px 18px;
+    min-height: 170px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .zone:hover, .zone.over { border-color: var(--accent); background: var(--drop); }
+  .zone.filled { border-style: solid; border-color: var(--accent); }
+  .zone .label { font-size: 1.25rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .zone .sub { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+  .zone .file { margin-top: 12px; font-size: .9rem; word-break: break-all; }
+  .zone .file strong { display: block; }
+  .zone input { display: none; }
+  .zone .clear {
+    position: absolute; top: 8px; right: 10px;
+    border: 0; background: none; color: var(--muted);
+    font-size: 1.2rem; cursor: pointer; display: none;
+  }
+  .zone.filled .clear { display: block; }
+  .options { margin: 20px 2px 0; color: var(--muted); font-size: .95rem; }
+  .options label { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+  .actions { margin-top: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  button.start {
+    background: var(--accent); color: var(--accent-ink);
+    border: 0; border-radius: 10px;
+    padding: 12px 28px; font-size: 1rem; font-weight: 600;
+    cursor: pointer;
+  }
+  button.start:disabled { opacity: .4; cursor: not-allowed; }
+  .save { display: none; margin-top: 16px; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .save.show { display: flex; }
+  .save input {
+    flex: 1 1 260px; min-width: 0;
+    font: inherit; color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  }
+  .save input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.download {
+    border: 2px solid var(--accent); color: var(--accent); background: none;
+    border-radius: 10px; padding: 10px 20px;
+    font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .preview { display: none; margin-top: 20px; }
+  .preview.show { display: block; }
+  .preview iframe {
+    width: 100%; height: 80vh; border: 1px solid var(--line);
+    border-radius: 12px; background: #fff;
+  }
+  .hint { flex-basis: 100%; color: var(--muted); font-size: .85rem; margin: 2px 2px 0; }
+  #status { margin-top: 16px; min-height: 1.5em; font-size: .95rem; }
+  #status.ok { color: var(--ok); }
+  #status.warn { color: var(--warn); }
+  #status.err { color: var(--err); }
+  .how { margin: -12px 0 24px; color: var(--muted); font-size: .9rem; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+  .how ol { padding-left: 20px; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PDF Duplex-Mischer</h1>
+  <p class="lead">Vorder- und Rückseiten aus zwei Scans zu einem Dokument zusammenführen. Alles läuft lokal im Browser, nichts wird hochgeladen.</p>
+
+  <div class="how">
+    So wird gescannt:
+    <ol>
+      <li>Stapel einlegen, alle Vorderseiten in eine Datei scannen.</li>
+      <li>Stapel umdrehen, alle Rückseiten in eine zweite Datei scannen. Diese liegen dann in umgekehrter Reihenfolge vor.</li>
+      <li>Beide Dateien unten ablegen und „Start“ drücken.</li>
+    </ol>
+  </div>
+
+  <div class="zones">
+    <div class="zone" id="zoneOdd" tabindex="0">
+      <button class="clear" title="Entfernen" aria-label="Datei entfernen">×</button>
+      <div class="label">Seite 1, 3, 5, …</div>
+      <div class="sub">Vorderseiten-PDF hierher ziehen<br>oder klicken</div>
+      <div class="file"></div>
+      <input type="file" accept="application/pdf,.pdf">
+    </div>
+    <div class="zone" id="zoneEven" tabindex="0">
+      <button class="clear" title="Entfernen" aria-label="Datei entfernen">×</button>
+      <div class="label">Seite …, 6, 4, 2</div>
+      <div class="sub">Rückseiten-PDF hierher ziehen<br>oder klicken</div>
+      <div class="file"></div>
+      <input type="file" accept="application/pdf,.pdf">
+    </div>
+  </div>
+
+  <div class="options">
+    <label><input type="checkbox" id="reverse" checked> Rückseiten-Datei umdrehen (letzte Seite = Seite 2)</label>
+  </div>
+
+  <div class="actions">
+    <button class="start" id="start" disabled>Start</button>
+  </div>
+  <div id="status"></div>
+  <div class="save" id="save">
+    <input type="text" id="filename" aria-label="Dateiname" spellcheck="false">
+    <button class="download" id="download">Speichern …</button>
+    <button class="download" id="tabBtn">In neuem Tab öffnen</button>
+    <p class="hint" id="saveHint"></p>
+  </div>
+  <div class="preview" id="preview">
+    <iframe id="previewFrame" title="Vorschau des gemischten PDFs"></iframe>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  const files = { odd: null, even: null };
+  const startBtn = document.getElementById('start');
+  const dl = document.getElementById('download');
+  const saveBox = document.getElementById('save');
+  const nameInput = document.getElementById('filename');
+  const saveHint = document.getElementById('saveHint');
+  const statusEl = document.getElementById('status');
+  const hasPicker = typeof window.showSaveFilePicker === 'function';
+  // iPad meldet sich als „Macintosh“, hat aber Touch – daran erkennen wir iPhone/iPad
+  const isTouchApple = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const canShareFiles = isTouchApple && typeof navigator.share === 'function' &&
+    typeof navigator.canShare === 'function' &&
+    (() => { try { return navigator.canShare({ files: [new File([''], 't.pdf', { type: 'application/pdf' })] }); } catch (e) { return false; } })();
+  let resultBlob = null;
+
+  if (canShareFiles) {
+    saveHint.textContent = '„Speichern …“ öffnet das Teilen-Menü. Dort „In Dateien sichern“ wählen, dann Ordner und Namen festlegen.';
+  } else if (hasPicker) {
+    saveHint.textContent = 'Beim Speichern öffnet sich ein Dialog für Ordner und Dateinamen.';
+  } else {
+    saveHint.textContent = 'Ordner und Namen frei wählen: Rechtsklick in die Vorschau › „Mit Vorschau öffnen“, dann ⌘S. Oder „In neuem Tab öffnen“ und dort ⌘S. „Speichern …“ legt die Datei in den Download-Ordner.';
+  }
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text || '';
+    statusEl.className = kind || '';
+  }
+
+  const tabBtn = document.getElementById('tabBtn');
+  const previewBox = document.getElementById('preview');
+  const previewFrame = document.getElementById('previewFrame');
+  let previewUrl = null;
+
+  function showPreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(resultBlob);
+    previewFrame.src = previewUrl;
+    previewBox.classList.add('show');
+  }
+
+  function hidePreview() {
+    previewBox.classList.remove('show');
+    previewFrame.removeAttribute('src');
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+  }
+
+  tabBtn.addEventListener('click', () => {
+    if (!previewUrl) return;
+    const w = window.open(previewUrl, '_blank');
+    if (!w) setStatus('Der neue Tab wurde blockiert. Bitte Pop-ups für diese Seite erlauben.', 'warn');
+  });
+  // Auf dem iPad ist der Tab-Weg überflüssig, dort geht alles übers Teilen-Menü
+  if (canShareFiles) tabBtn.style.display = 'none';
+
+  function resetDownload() {
+    resultBlob = null;
+    saveBox.classList.remove('show');
+    hidePreview();
+  }
+
+  function cleanName(name) {
+    name = (name || '').trim().replace(/[\/\\:*?"<>|]/g, '_') || 'gemischt';
+    return /\.pdf$/i.test(name) ? name : name + '.pdf';
+  }
+
+  async function saveResult() {
+    if (!resultBlob) return;
+    const name = cleanName(nameInput.value);
+    nameInput.value = name;
+    if (canShareFiles) {
+      try {
+        const file = new File([resultBlob], name, { type: 'application/pdf' });
+        await navigator.share({ files: [file] });
+      } catch (e) {
+        if (e.name !== 'AbortError') setStatus('Teilen fehlgeschlagen: ' + e.message, 'err');
+      }
+      return;
+    }
+    if (hasPicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          types: [{ description: 'PDF-Dokument', accept: { 'application/pdf': ['.pdf'] } }]
+        });
+        const w = await handle.createWritable();
+        await w.write(resultBlob);
+        await w.close();
+        setStatus('Gespeichert als „' + handle.name + '“.', 'ok');
+      } catch (e) {
+        if (e.name !== 'AbortError') setStatus('Speichern fehlgeschlagen: ' + e.message, 'err');
+      }
+      return;
+    }
+    const url = URL.createObjectURL(resultBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  dl.addEventListener('click', saveResult);
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveResult(); });
+
+  async function countPages(file) {
+    const doc = await PDFLib.PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+    return doc.getPageCount();
+  }
+
+  function setupZone(id, key) {
+    const zone = document.getElementById(id);
+    const input = zone.querySelector('input');
+    const fileEl = zone.querySelector('.file');
+    const clearBtn = zone.querySelector('.clear');
+
+    async function accept(file) {
+      if (!file) return;
+      if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+        setStatus('„' + file.name + '“ ist keine PDF-Datei.', 'err');
+        return;
+      }
+      resetDownload();
+      files[key] = { file: file, pages: null };
+      zone.classList.add('filled');
+      fileEl.innerHTML = '<strong></strong><span>wird gelesen …</span>';
+      fileEl.querySelector('strong').textContent = file.name;
+      try {
+        const n = await countPages(file);
+        if (files[key] && files[key].file === file) {
+          files[key].pages = n;
+          fileEl.querySelector('span').textContent = n + (n === 1 ? ' Seite' : ' Seiten');
+        }
+        setStatus('');
+      } catch (e) {
+        files[key] = null;
+        zone.classList.remove('filled');
+        fileEl.textContent = '';
+        setStatus('„' + file.name + '“ konnte nicht gelesen werden: ' + e.message, 'err');
+      }
+      update();
+    }
+
+    zone.addEventListener('click', (e) => { if (e.target !== clearBtn) input.click(); });
+    zone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', () => { accept(input.files[0]); input.value = ''; });
+    ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, (e) => {
+      e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; zone.classList.add('over');
+    }));
+    ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, () => zone.classList.remove('over')));
+    zone.addEventListener('drop', (e) => { e.preventDefault(); accept(e.dataTransfer.files[0]); });
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      files[key] = null;
+      zone.classList.remove('filled');
+      fileEl.textContent = '';
+      resetDownload();
+      setStatus('');
+      update();
+    });
+  }
+
+  // Verhindert, dass Safari eine danebengezogene PDF öffnet und die Seite verlässt
+  ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, (e) => e.preventDefault()));
+
+  function update() {
+    startBtn.disabled = !(files.odd && files.odd.pages && files.even && files.even.pages);
+  }
+
+  // Reihenfolge: V1, R1, V2, R2, …  (Rückseiten bei Bedarf vorher umgedreht)
+  function buildOrder(nOdd, nEven, reverseEven) {
+    const even = [];
+    for (let i = 0; i < nEven; i++) even.push(reverseEven ? nEven - 1 - i : i);
+    const order = [];
+    const max = Math.max(nOdd, nEven);
+    for (let i = 0; i < max; i++) {
+      if (i < nOdd) order.push(['odd', i]);
+      if (i < nEven) order.push(['even', even[i]]);
+    }
+    return order;
+  }
+
+  startBtn.addEventListener('click', async () => {
+    resetDownload();
+    startBtn.disabled = true;
+    setStatus('Mische Seiten …');
+    try {
+      const { PDFDocument } = PDFLib;
+      const opts = { ignoreEncryption: true };
+      const oddDoc = await PDFDocument.load(await files.odd.file.arrayBuffer(), opts);
+      const evenDoc = await PDFDocument.load(await files.even.file.arrayBuffer(), opts);
+      const nOdd = oddDoc.getPageCount();
+      const nEven = evenDoc.getPageCount();
+      const out = await PDFDocument.create();
+
+      const oddPages = await out.copyPages(oddDoc, oddDoc.getPageIndices());
+      const evenPages = await out.copyPages(evenDoc, evenDoc.getPageIndices());
+      const src = { odd: oddPages, even: evenPages };
+      for (const [k, i] of buildOrder(nOdd, nEven, document.getElementById('reverse').checked)) {
+        out.addPage(src[k][i]);
+      }
+
+      const bytes = await out.save();
+      resultBlob = new Blob([bytes], { type: 'application/pdf' });
+      const base = files.odd.file.name.replace(/\.pdf$/i, '');
+      nameInput.value = base + '_gemischt.pdf';
+      dl.textContent = 'Speichern … (' + out.getPageCount() + ' Seiten)';
+      saveBox.classList.add('show');
+      showPreview();
+      if (!isTouchApple) {
+        nameInput.focus();
+        nameInput.setSelectionRange(0, nameInput.value.length - 4);
+      }
+
+      if (nOdd === nEven || nOdd === nEven + 1) {
+        setStatus('Fertig: ' + nOdd + ' Vorder- und ' + nEven + ' Rückseiten gemischt.', 'ok');
+      } else {
+        setStatus('Fertig, aber Achtung: ' + nOdd + ' Vorderseiten und ' + nEven +
+          ' Rückseiten passen nicht zusammen. Überzählige Seiten stehen am Ende.', 'warn');
+      }
+    } catch (e) {
+      setStatus('Fehler beim Mischen: ' + e.message, 'err');
+    } finally {
+      update();
+    }
+  });
+
+  setupZone('zoneOdd', 'odd');
+  setupZone('zoneEven', 'even');
+})();
+</script>
+</body>
+</html>
