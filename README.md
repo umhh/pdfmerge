@@ -2,13 +2,15 @@
 
 Browserbasiertes Tool, das zwei Scans eines doppelseitigen Dokuments zu **einem** PDF in richtiger Seitenreihenfolge zusammenführt. Gedacht für Scanner ohne Duplex-Einzug: erst alle Vorderseiten scannen, dann den Stapel umdrehen und alle Rückseiten scannen.
 
+**Online nutzen:** https://umhh.github.io/pdfmerge/
+
 Alles läuft lokal im Browser. Die PDFs werden **nicht hochgeladen** und verlassen den Rechner nicht.
 
 ---
 
 ## Schnellstart
 
-1. `index.html` in Safari öffnen (Doppelklick oder über die GitHub-Pages-Adresse, falls eingerichtet).
+1. **https://umhh.github.io/pdfmerge/** in Safari öffnen (oder `index.html` lokal per Doppelklick).
 2. Vorderseiten-PDF in das Feld **„Seite 1, 3, 5, …“** ziehen.
 3. Rückseiten-PDF in das Feld **„Seite …, 6, 4, 2“** ziehen.
 4. **Start** drücken.
